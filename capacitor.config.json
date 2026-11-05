@@ -1,0 +1,9 @@
+{
+  "appId": "com.girtonroad.ledger",
+  "appName": "Girton Road Ledger",
+  "webDir": "www",
+  "backgroundColor": "#f4f6fb",
+  "android": {
+    "allowMixedContent": false
+  }
+}
