@@ -1,0 +1,23 @@
+name: Keep Supabase awake
+
+# Free Supabase projects pause after a week with no activity.
+# This sends one tiny request every 3 days so the project stays awake.
+on:
+  schedule:
+    - cron: '17 6 */3 * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ping the database
+        run: |
+          URL=$(grep -oE "url:[[:space:]]*'[^']+'" src/supabase-config.js | sed -E "s/.*'([^']+)'.*/\1/")
+          KEY=$(grep -oE "anonKey:[[:space:]]*'[^']+'" src/supabase-config.js | sed -E "s/.*'([^']+)'.*/\1/")
+          if [ -z "$URL" ] || [ -z "$KEY" ]; then echo "Supabase is not configured yet, nothing to ping."; exit 0; fi
+          code=$(curl -s -o /dev/null -w "%{http_code}" "$URL/rest/v1/blobs?select=name&limit=1" -H "apikey: $KEY" -H "Authorization: Bearer $KEY")
+          echo "Supabase answered with HTTP $code"
+          test "$code" -lt 500
