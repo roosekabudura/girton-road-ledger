@@ -26,6 +26,12 @@ jobs:
       - name: Build web assets (offline copy)
         run: npm run prepare-www
 
+      - name: Keep a copy of the web files
+        uses: actions/upload-artifact@v4
+        with:
+          name: girton-web-files
+          path: www
+
       - name: Create Android project
         run: npx cap add android
 
