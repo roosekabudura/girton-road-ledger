@@ -1635,7 +1635,7 @@ function initCloud(){
       if (error) throw error;
     } catch(err){
       const msg = String(err && err.message || '');
-      showLoginForm(/fetch|network/i.test(msg) ? 'No internet connection. Try again when you are online.' : /rate|too many/i.test(msg) ? 'Too many attempts. Wait a few minutes and try again.' : 'That name or password is not correct.');
+      showLoginForm(/fetch|network/i.test(msg) ? 'No internet connection. Try again when you are online.' : /rate|too many/i.test(msg) ? 'Too many attempts. Wait a few minutes and try again.' : (/invalid login/i.test(msg) ? 'That name or password is not correct.' : 'Sign-in problem: ' + msg));
     }
   });
   $('signOutBtn').addEventListener('click', async () => {
