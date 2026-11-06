@@ -3,12 +3,20 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>13 Girton Road — Project Ledger v5</title>
+<title>13 Girton Road — Project Ledger</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#4f46e5">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="supabase-config.js"></script>
 <style>
 :root{
   --bg:#f4f6fb; --panel:#ffffff; --panel2:#f8f9fd; --line:#e4e8f1; --line2:#d3d9e6;
@@ -140,6 +148,14 @@ tr.grp td{background:var(--panel2);font-weight:650;font-size:12.5px;}
 .drow{display:flex;justify-content:space-between;gap:14px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px;} .drow span:first-child{color:var(--soft);} .drow span:last-child{font-weight:600;text-align:right;}
 
 #printReport{display:none;}
+body.viewer .admin-only{display:none !important;}
+#login{position:fixed;inset:0;z-index:300;background:var(--bg);display:none;align-items:center;justify-content:center;padding:20px;}
+.loginbox{width:100%;max-width:370px;background:var(--panel);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:28px 24px;text-align:center;}
+.loginbox .logo{margin:0 auto 14px;width:48px;height:48px;border-radius:14px;}
+.loginbox h2{font-size:19px;letter-spacing:-.02em;} .loginbox p{font-size:12.5px;color:var(--soft);margin:4px 0 18px;}
+.loginbox form{text-align:left;display:flex;flex-direction:column;gap:6px;} .loginbox input{width:100%;padding:10px 12px;font-size:15px;margin-bottom:8px;}
+.loginbox .btn{justify-content:center;padding:11px;font-size:14px;margin-top:4px;} #loginErr{font-size:12.5px;min-height:18px;}
+.who{font-size:12px;color:var(--soft);}
 @supports(padding:max(0px)){.top{padding-top:max(12px,env(safe-area-inset-top));}}
 @media print{
   .app,#detail,#detailScrim{display:none !important;} #printReport{display:block;padding:20px;color:#000;background:#fff;}
@@ -177,6 +193,7 @@ tr.grp td{background:var(--panel2);font-weight:650;font-size:12.5px;}
       <div class="spacer"></div>
       <div class="badge" id="dsBadge"><span class="dot"></span><span id="dsBadgeText">—</span></div>
       <div class="rate"><span class="t">ZiG/USD</span><input id="rateTop" type="number" step="0.1" min="0.1" value="30"></div>
+      <button class="btn sm" id="signOutBtn" style="display:none" title="Sign out"></button>
       <button class="iconbtn" id="themeBtn" aria-label="Toggle theme" title="Toggle light/dark"><span data-ic="moon"></span></button>
     </header>
 
@@ -252,7 +269,7 @@ tr.grp td{background:var(--panel2);font-weight:650;font-size:12.5px;}
       <section id="view-contractors" class="view">
         <div class="tabs" id="ctrTabs"><button class="tab active" data-ct="payments">Payments</button><button class="tab" data-ct="quotations">Quotations</button></div>
         <div id="ctPayments" style="display:flex;flex-direction:column;gap:18px">
-          <div class="card pad">
+          <div class="card pad admin-only">
             <div class="ctitle" style="margin-bottom:10px">Upload contractor payment schedule</div>
             <div class="drop" id="ctrDrop"><input type="file" id="ctrFile" accept=".xlsx,.xls" hidden><b>Drop the master contractor workbook here, or click to browse</b><span>.xlsx — one sheet per trade, with per-unit payment blocks</span></div>
             <div class="status" id="ctrStatus"></div><div class="badge" id="ctrBadge" style="display:none;margin-top:10px"></div>
@@ -272,7 +289,7 @@ tr.grp td{background:var(--panel2);font-weight:650;font-size:12.5px;}
           <div class="card"><div class="pad" style="padding-bottom:0"><div class="ctitle">Payment records</div></div><div class="tw" style="max-height:460px" id="ctrPayTable"></div></div>
         </div>
         <div id="ctQuotations" style="display:none;flex-direction:column;gap:18px">
-          <div class="card pad">
+          <div class="card pad admin-only">
             <div class="ctitle" style="margin-bottom:10px">Upload builder quotations comparison</div>
             <div class="drop" id="qteDrop"><input type="file" id="qteFile" accept=".xlsx,.xls" hidden><b>Drop the quotation comparison workbook here, or click to browse</b><span>.xlsx — side-by-side builder comparison sheet</span></div>
             <div class="status" id="qteStatus"></div><div class="badge" id="qteBadge" style="display:none;margin-top:10px"></div>
@@ -286,7 +303,7 @@ tr.grp td{background:var(--panel2);font-weight:650;font-size:12.5px;}
 
       <!-- SETTINGS -->
       <section id="view-settings" class="view">
-        <div class="card pad">
+        <div class="card pad admin-only">
           <div class="ctitle" style="margin-bottom:10px">Daily upload</div>
           <div class="drop" id="drop"><input type="file" id="file" accept=".csv,.xlsx,.xls" hidden><b>Drop today's schedule here, or click to browse</b><span>.csv or .xlsx, any filename. Headers are matched automatically.</span></div>
           <div class="status" id="upStatus"></div>
@@ -308,6 +325,10 @@ tr.grp td{background:var(--panel2);font-weight:650;font-size:12.5px;}
           </div>
         </div>
         <div class="card pad"><div class="ctitle">Budgets for non-unit allocations</div><div class="csub" style="margin-bottom:12px">For example "Shared" costs that are not tied to a single unit.</div><div id="budgetInputs" style="display:flex;flex-direction:column;gap:8px;max-width:460px"></div></div>
+        <div class="card pad admin-only" id="cloudCard" style="display:none">
+          <div class="ctitle">Cloud sync</div><div class="csub" style="margin-bottom:12px">Uploads are published automatically. Use the button to publish everything now, for example your existing data.</div>
+          <div class="frow"><button class="btn primary" id="publishBtn">Publish all data to cloud</button><span class="who" id="cloudStatus"></span></div>
+        </div>
         <div class="card pad">
           <div class="ctitle">Export, report &amp; backup</div><div class="csub" style="margin-bottom:12px">Exports use the current filters.</div>
           <div class="frow">
@@ -315,7 +336,7 @@ tr.grp td{background:var(--panel2);font-weight:650;font-size:12.5px;}
             <button class="btn" id="expXlsx"><span data-ic="download"></span>Excel</button>
             <button class="btn" id="printBtn"><span data-ic="printer"></span>Print summary report</button>
             <button class="btn" id="backupBtn"><span data-ic="download"></span>Back up all data</button>
-            <button class="btn" id="restoreBtn"><span data-ic="upload"></span>Restore backup</button><input type="file" id="restoreFile" accept=".json" hidden>
+            <button class="btn admin-only" id="restoreBtn"><span data-ic="upload"></span>Restore backup</button><input type="file" id="restoreFile" accept=".json" hidden>
           </div>
         </div>
       </section>
@@ -323,6 +344,22 @@ tr.grp td{background:var(--panel2);font-weight:650;font-size:12.5px;}
   </div>
 </div>
 
+<div id="login">
+  <div class="loginbox">
+    <div class="logo"><span data-ic="home"></span></div>
+    <h2>13 Girton Road</h2>
+    <p>Project ledger. Sign in to see the latest figures.</p>
+    <div id="loginWait" class="status show" style="justify-content:center"><span class="spin"></span><span style="color:var(--soft)">Checking sign-in…</span></div>
+    <form id="loginForm" style="display:none" autocomplete="on">
+      <label class="lbl" for="loginUser">Name or initials</label>
+      <input id="loginUser" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false">
+      <label class="lbl" for="loginPass">Password</label>
+      <input id="loginPass" type="password" autocomplete="current-password">
+      <div id="loginErr" class="bad"></div>
+      <button class="btn primary" id="loginBtn" type="submit">Sign in</button>
+    </form>
+  </div>
+</div>
 <div id="detailScrim"></div>
 <aside id="detail"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><h3 style="font-size:16px">Transaction detail</h3><button class="iconbtn" id="detailClose" aria-label="Close"><span data-ic="x"></span></button></div><div id="detailBody"></div></aside>
 <div id="printReport"></div>
@@ -1241,6 +1278,7 @@ function renderSettings(){
   $('budgetInputs').innerHTML = allocs.map(a=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:13px"><span style="color:var(--soft)">${esc(a)}</span><span>$ <input type="number" min="0" step="100" data-budget="${esc(a)}" value="${state.budgets[a]||''}" placeholder="0" style="width:130px;text-align:right"></span></div>`).join('') || '<div style="color:var(--dim)">No non-unit allocations found.</div>';
   const usdEq = sum(state.data.map(amountUSD));
   $('upSummary').innerHTML = kpi('Records', state.data.length.toLocaleString(), esc(state.meta.isSample?'Sample data':(state.meta.filename||''))) + kpi('USD equivalent', fmtUSD(usdEq), '') + kpi('Uploaded', `<span style="font-size:14px">${state.meta.uploadedAt?new Date(state.meta.uploadedAt).toLocaleString():'—'}</span>`, '');
+  applyRole();
 }
 
 /* ======================================================================
@@ -1267,7 +1305,7 @@ function switchView(v){
 }
 function renderBadge(){
   const label = state.meta.isSample ? 'Sample data' : (state.meta.filename || 'Uploaded file');
-  $('dsBadgeText').textContent = `${label} · ${state.data.length} rows · ${state.meta.uploadedAt?new Date(state.meta.uploadedAt).toLocaleDateString():''}`;
+  $('dsBadgeText').textContent = `${label} · ${state.data.length} rows · ${state.meta.uploadedAt?new Date(state.meta.uploadedAt).toLocaleDateString():''}${cloudOn&&fb.note?' · '+fb.note:''}`;
 }
 function openSide(){ $('side').classList.add('open'); $('scrim').classList.add('open'); }
 function closeSide(){ $('side').classList.remove('open'); $('scrim').classList.remove('open'); }
@@ -1298,11 +1336,11 @@ function applyTheme(t){
 function setRate(v){
   const rate = parseFloat(v); if (isNaN(rate) || rate<=0) return;
   state.currency.rate = rate; $('rateTop').value = rate; if (document.activeElement!==$('rateIn')) $('rateIn').value = rate;
-  saveToStorage(); updateFilterUI(); renderCurrent();
+  saveToStorage(); cloudPushSettingsSoon(); updateFilterUI(); renderCurrent();
 }
 function afterDataChange(){
   indexData(); state.filters = emptyFilters(); state.preset='all';
-  saveToStorage(); buildFilterBar(); renderCurrent();
+  saveToStorage(); buildFilterBar(); renderCurrent(); cloudPushLedger();
 }
 function setStatus(el, html, show=true){ el.classList.toggle('show', show); el.innerHTML = html; }
 function handleFile(file){
@@ -1340,7 +1378,7 @@ function handleContractorFile(file){
     state.contractors = { payments, budgets, meta:{ filename:file.name, uploadedAt:new Date().toISOString() } };
     state.ctrFilters = { search:'', contractor:'', unit:'', dateFrom:'', dateTo:'' };
     $('ctrSearch').value=''; $('ctrFrom').value=''; $('ctrTo').value='';
-    saveContractorsToStorage(); populateContractorFilters(); renderContractors();
+    saveContractorsToStorage(); populateContractorFilters(); renderContractors(); cloudPushContractors();
     setStatus(st, `<span class="good">${ic('check')}</span><span class="good">Loaded ${payments.length} payment records across ${new Set(payments.map(p=>p.contractor)).size} contractors.</span>`);
   } catch(err){ setStatus(st, `<span class="bad">Could not parse workbook: ${esc(err.message)}</span>`); } };
   rd.readAsArrayBuffer(file);
@@ -1354,7 +1392,7 @@ function handleQuotationsFile(file){
     const { items, builders } = parseQuotationsWorkbook(wb);
     if (!items.length){ setStatus(st, `<span class="warn">No comparison table found in this workbook.</span>`); return; }
     state.quotations = { items, builders, meta:{ filename:file.name, uploadedAt:new Date().toISOString() } };
-    state.qteFilters = { section:'' }; saveContractorsToStorage(); populateQuotationFilters(); renderContractors();
+    state.qteFilters = { section:'' }; saveContractorsToStorage(); populateQuotationFilters(); renderContractors(); cloudPushQuotes();
     setStatus(st, `<span class="good">${ic('check')}</span><span class="good">Loaded ${items.length} line items across ${builders.length} builders.</span>`);
   } catch(err){ setStatus(st, `<span class="bad">Could not parse workbook: ${esc(err.message)}</span>`); } };
   rd.readAsArrayBuffer(file);
@@ -1430,9 +1468,9 @@ function bindEvents(){
   ['rateTop','rateIn'].forEach(id=>$(id).addEventListener('input', e=>setRate(e.target.value)));
   document.querySelectorAll('.rate-preset').forEach(b=>b.addEventListener('click',()=>{ setRate(b.dataset.rate); $('rateIn').value=b.dataset.rate; }));
   $('modeToggle').addEventListener('click', ()=>{ state.currency.mode = state.currency.mode==='converted'?'dual':'converted'; saveToStorage(); renderSettings(); });
-  $('devRate').addEventListener('input', e=>{ const v=parseFloat(e.target.value); if(isNaN(v)||v<0) return; state.budgetRates.development=v; $('totPerUnit').textContent=fmtUSD(state.budgetRates.development+state.budgetRates.construction); saveToStorage(); });
-  $('conRate').addEventListener('input', e=>{ const v=parseFloat(e.target.value); if(isNaN(v)||v<0) return; state.budgetRates.construction=v; $('totPerUnit').textContent=fmtUSD(state.budgetRates.development+state.budgetRates.construction); saveToStorage(); });
-  $('budgetInputs').addEventListener('input', e=>{ const i=e.target.closest('input[data-budget]'); if(!i) return; const v=parseFloat(i.value); if(!isNaN(v)&&v>0) state.budgets[i.dataset.budget]=v; else delete state.budgets[i.dataset.budget]; saveToStorage(); });
+  $('devRate').addEventListener('input', e=>{ const v=parseFloat(e.target.value); if(isNaN(v)||v<0) return; state.budgetRates.development=v; $('totPerUnit').textContent=fmtUSD(state.budgetRates.development+state.budgetRates.construction); saveToStorage(); cloudPushSettingsSoon(); });
+  $('conRate').addEventListener('input', e=>{ const v=parseFloat(e.target.value); if(isNaN(v)||v<0) return; state.budgetRates.construction=v; $('totPerUnit').textContent=fmtUSD(state.budgetRates.development+state.budgetRates.construction); saveToStorage(); cloudPushSettingsSoon(); });
+  $('budgetInputs').addEventListener('input', e=>{ const i=e.target.closest('input[data-budget]'); if(!i) return; const v=parseFloat(i.value); if(!isNaN(v)&&v>0) state.budgets[i.dataset.budget]=v; else delete state.budgets[i.dataset.budget]; saveToStorage(); cloudPushSettingsSoon(); });
   bindDrop($('drop'),$('file'),handleFile); bindDrop($('ctrDrop'),$('ctrFile'),handleContractorFile); bindDrop($('qteDrop'),$('qteFile'),handleQuotationsFile);
   $('expCsv').addEventListener('click', exportCsv); $('expXlsx').addEventListener('click', exportXlsx); $('printBtn').addEventListener('click', printReport);
   $('backupBtn').addEventListener('click', backupAll); $('restoreBtn').addEventListener('click', ()=>$('restoreFile').click());
@@ -1457,6 +1495,161 @@ function bindEvents(){
   $('qteSection').addEventListener('change', e=>{ state.qteFilters.section=e.target.value; renderContractorsQuotations(); });
 }
 
+
+/* ======================================================================
+   CLOUD SYNC (Supabase). Dormant until supabase-config.js is filled in.
+   One admin uploads; everyone signed in sees the same data.
+====================================================================== */
+const CLOUD = window.GIRTON_CLOUD || {};
+const cloudOn = !!(CLOUD.supabase && CLOUD.supabase.url && CLOUD.supabase.anonKey);
+const fb = { sb:null, user:null, isAdmin:false, versions:{}, channel:null, poll:null, settingsTimer:null, busy:false, note:'' };
+function slug(n){ return String(n||'').toLowerCase().replace(/[^a-z0-9]/g,''); }
+function userEmail(n){ return slug(n) + '@' + (CLOUD.emailDomain || 'girton-ledger.app'); }
+function setSync(msg){ fb.note = msg; const el = $('cloudStatus'); if (el) el.textContent = msg; try { renderBadge(); } catch(e){} }
+function applyRole(){
+  const viewer = cloudOn && !fb.isAdmin;
+  document.body.classList.toggle('viewer', viewer);
+  ['rateTop','rateIn','devRate','conRate'].forEach(id => { if ($(id)) $(id).disabled = viewer; });
+  document.querySelectorAll('.rate-preset').forEach(b => b.disabled = viewer);
+  document.querySelectorAll('#budgetInputs input').forEach(i => i.disabled = viewer);
+  const card = $('cloudCard'); if (card) card.style.display = (cloudOn && fb.isAdmin) ? '' : 'none';
+}
+async function blobSave(name, obj, extra){
+  const version = String(Date.now());
+  fb.versions[name] = version;
+  const { error } = await fb.sb.from('blobs').upsert({ name, version, meta: extra || {}, data: obj, updated_at: new Date().toISOString() });
+  if (error) throw error;
+}
+function applyCloudLedger(data, m){
+  state.data = (data || []).map(r => ({ ...r, date: r.date ? new Date(r.date) : null }));
+  state.meta = { filename: m.filename || 'cloud data', uploadedAt: m.uploadedAt || m.updatedAt, isSample:false };
+  indexData(); saveToStorage(); buildFilterBar();
+}
+function applyCloudContractors(data, m){
+  data = data || {};
+  state.contractors = { payments:(data.payments || []).map(p => ({ ...p, date: p.date ? new Date(p.date) : null })), budgets:data.budgets || [], meta:{ filename:m.filename, uploadedAt:m.uploadedAt || m.updatedAt } };
+  saveContractorsToStorage(); populateContractorFilters();
+}
+function applyCloudQuotes(data, m){
+  data = data || {};
+  state.quotations = { items:data.items || [], builders:data.builders || [], meta:{ filename:m.filename, uploadedAt:m.uploadedAt || m.updatedAt } };
+  saveContractorsToStorage(); populateQuotationFilters();
+}
+function applyCloudSettings(s){
+  s = s || {};
+  if (typeof s.rate === 'number' && s.rate > 0) state.currency.rate = s.rate;
+  state.budgetRates = { development: s.devRate ?? state.budgetRates.development, construction: s.conRate ?? state.budgetRates.construction };
+  try { state.budgets = typeof s.budgets === 'string' ? JSON.parse(s.budgets || '{}') : (s.budgets || {}); } catch(e){}
+  $('rateTop').value = state.currency.rate; $('rateIn').value = state.currency.rate;
+  saveToStorage();
+}
+function cloudErr(err){
+  console.warn(err);
+  const msg = String(err && (err.message || err.code) || 'unknown');
+  setSync(/fetch|network|failed/i.test(msg) ? 'Offline, showing saved copy' : 'Sync problem: ' + msg);
+}
+async function cloudRefresh(){
+  if (!fb.sb || !fb.user || fb.busy) return;
+  fb.busy = true;
+  try {
+    const { data: rows, error } = await fb.sb.from('blobs').select('name,version,meta,updated_at');
+    if (error) throw error;
+    if (!rows.length){ setSync(fb.isAdmin ? 'Nothing published yet' : 'No data published yet, or your name is not on the member list'); return; }
+    let changed = false;
+    for (const row of rows){
+      if (fb.versions[row.name] === row.version) continue;
+      const { data: full, error: e2 } = await fb.sb.from('blobs').select('data').eq('name', row.name).single();
+      if (e2) throw e2;
+      const m = Object.assign({ updatedAt: row.updated_at }, row.meta || {});
+      fb.versions[row.name] = row.version;
+      if (row.name === 'ledger') applyCloudLedger(full.data, m);
+      else if (row.name === 'contractors') applyCloudContractors(full.data, m);
+      else if (row.name === 'quotes') applyCloudQuotes(full.data, m);
+      else if (row.name === 'settings') applyCloudSettings(full.data);
+      changed = true;
+    }
+    setSync('Up to date · ' + new Date().toLocaleTimeString());
+    if (changed) renderCurrent();
+  } catch(e){ cloudErr(e); }
+  finally { fb.busy = false; }
+}
+function stopListen(){
+  if (fb.channel && fb.sb){ try { fb.sb.removeChannel(fb.channel); } catch(e){} }
+  fb.channel = null; clearInterval(fb.poll); fb.poll = null; fb.versions = {};
+}
+function cloudListen(){
+  stopListen();
+  try { fb.channel = fb.sb.channel('blobs-changes').on('postgres_changes', { event:'*', schema:'public', table:'blobs' }, () => cloudRefresh()).subscribe(); } catch(e){ console.warn(e); }
+  fb.poll = setInterval(cloudRefresh, 60000);
+  cloudRefresh();
+}
+function canPush(){ return cloudOn && fb.isAdmin && fb.sb; }
+async function guarded(label, fn){
+  setSync('Publishing ' + label + '…');
+  try { await fn(); setSync('Published ' + label + ' · ' + new Date().toLocaleTimeString()); }
+  catch(e){ console.warn(e); setSync('Could not publish ' + label + ': ' + (e.message || e.code)); }
+}
+function cloudPushLedger(){ if (!canPush() || state.meta.isSample) return Promise.resolve(); return guarded('ledger', () => blobSave('ledger', state.data.map(r => { const { __id, ...x } = r; return x; }), { filename:state.meta.filename, uploadedAt:state.meta.uploadedAt })); }
+function cloudPushContractors(){ if (!canPush() || !state.contractors.payments.length) return Promise.resolve(); return guarded('contractors', () => blobSave('contractors', { payments:state.contractors.payments, budgets:state.contractors.budgets }, { filename:state.contractors.meta.filename, uploadedAt:state.contractors.meta.uploadedAt })); }
+function cloudPushQuotes(){ if (!canPush() || !state.quotations.items.length) return Promise.resolve(); return guarded('quotations', () => blobSave('quotes', { items:state.quotations.items, builders:state.quotations.builders }, { filename:state.quotations.meta.filename, uploadedAt:state.quotations.meta.uploadedAt })); }
+function cloudPushSettings(){
+  if (!canPush()) return Promise.resolve();
+  return guarded('settings', () => blobSave('settings', { rate:state.currency.rate, devRate:state.budgetRates.development, conRate:state.budgetRates.construction, budgets:state.budgets }, {}));
+}
+function cloudPushSettingsSoon(){ if (!canPush()) return; clearTimeout(fb.settingsTimer); fb.settingsTimer = setTimeout(cloudPushSettings, 800); }
+async function publishAll(){
+  if (state.meta.isSample && !confirm('You are still on sample data, so the ledger will not be published. Publish the other settings anyway?')) return;
+  await cloudPushLedger(); await cloudPushContractors(); await cloudPushQuotes(); await cloudPushSettings();
+}
+function showLoginForm(msg){
+  $('login').style.display = 'flex'; $('loginWait').classList.remove('show'); $('loginForm').style.display = 'flex';
+  $('loginErr').textContent = msg || ''; $('loginBtn').disabled = false;
+}
+function handleSession(user){
+  if (user && fb.user && fb.user.id === user.id){ fb.user = user; return; }
+  fb.user = user || null;
+  if (!user){
+    fb.isAdmin = false; stopListen(); $('signOutBtn').style.display = 'none'; $('loginPass').value = ''; showLoginForm(''); applyRole(); return;
+  }
+  fb.isAdmin = (user.email || '').toLowerCase() === userEmail(CLOUD.adminUsername || 'admin');
+  $('login').style.display = 'none';
+  const who = (user.email || '').split('@')[0];
+  $('signOutBtn').style.display = ''; $('signOutBtn').textContent = 'Sign out (' + who + ')';
+  applyRole(); cloudListen(); renderCurrent();
+}
+function initCloud(){
+  applyRole();
+  if (!cloudOn) return;
+  $('login').style.display = 'flex';
+  if (!window.supabase || !window.supabase.createClient){
+    showLoginForm('Could not load the sign-in service. Check your internet connection and reopen the app.'); $('loginForm').style.display = 'none'; return;
+  }
+  fb.sb = window.supabase.createClient(CLOUD.supabase.url, CLOUD.supabase.anonKey, { auth:{ persistSession:true, autoRefreshToken:true } });
+  $('loginForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const u = $('loginUser').value.trim(), p = $('loginPass').value;
+    if (!slug(u) || !p){ $('loginErr').textContent = 'Enter your name and password.'; return; }
+    $('loginBtn').disabled = true; $('loginErr').textContent = '';
+    try {
+      const { error } = await fb.sb.auth.signInWithPassword({ email: userEmail(u), password: p });
+      if (error) throw error;
+    } catch(err){
+      const msg = String(err && err.message || '');
+      showLoginForm(/fetch|network/i.test(msg) ? 'No internet connection. Try again when you are online.' : /rate|too many/i.test(msg) ? 'Too many attempts. Wait a few minutes and try again.' : 'That name or password is not correct.');
+    }
+  });
+  $('signOutBtn').addEventListener('click', async () => {
+    const viewer = !fb.isAdmin;
+    stopListen(); await fb.sb.auth.signOut();
+    if (viewer){ try { localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(CONTRACTORS_STORAGE_KEY); } catch(e){} location.reload(); }
+  });
+  fb.sb.auth.onAuthStateChange((event, session) => { setTimeout(() => handleSession(session && session.user), 0); });
+  fb.sb.auth.getSession().then(({ data }) => handleSession(data && data.session && data.session.user)).catch(() => handleSession(null));
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) cloudRefresh(); });
+  window.addEventListener('online', cloudRefresh);
+}
+function registerSW(){ if ('serviceWorker' in navigator && !isNative() && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => {}); }
+
 /* ======================================================================
    INIT
 ====================================================================== */
@@ -1467,7 +1660,7 @@ function init(){
   hydrate(); initChartBoxes(); applyTheme(th);
   $('rateTop').value = state.currency.rate;
   buildFilterBar(); populateContractorFilters(); populateQuotationFilters();
-  bindEvents(); if (isNative()) $('printBtn').style.display='none'; switchView('overview');
+  bindEvents(); if (isNative()) $('printBtn').style.display='none'; switchView('overview'); $('publishBtn').addEventListener('click', publishAll); registerSW(); initCloud();
 }
 init();
 </script>

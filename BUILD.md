@@ -58,3 +58,7 @@ You can also run `npm run open` to open the project in Android Studio and use **
 
 To update the app later, change `src/index.html`, push again, and download the new APK.
 This builds the debug (test) version. A release APK for publishing needs a signing key stored as GitHub secrets.
+
+## Live sync between phones
+See **CLOUD-SETUP.md**. It covers the free Supabase database, sign-ins, the hosted link and the APK.
+Until `src/supabase-config.js` is filled in, the app runs in local mode exactly as before.
